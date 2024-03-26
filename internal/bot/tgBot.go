@@ -16,6 +16,13 @@ type TgBotModel struct {
 	dictionaryStorage          *db.DictionaryStorage
 	wordsStorage               *db.WordsStorage
 	tempStorageForAddingWords  map[int64]*db.Word
+	tempStorageForEditingWords map[int64]*StructForAddingWord
+}
+
+type StructForAddingWord struct {
+	Word    *db.Word
+	Columns []string
+	Count   int
 }
 
 type DictionaryIdentificator struct {
@@ -32,6 +39,7 @@ func NewClient(token string) (*TgBotModel, error) {
 	tempColumnsForDictionaries := make(map[DictionaryIdentificator][]string)
 	userLastMessageId := make(map[int64]int)
 	tempStorageForAddingWords := make(map[int64]*db.Word)
+	tempStorageForEditingWords := make(map[int64]*StructForAddingWord)
 
 	userStorage, err := db.NewUserStorage()
 	if err != nil {
@@ -57,6 +65,7 @@ func NewClient(token string) (*TgBotModel, error) {
 		dictionaryStorage:          dictionaryStorage,
 		wordsStorage:               wordsStorage,
 		tempStorageForAddingWords:  tempStorageForAddingWords,
+		tempStorageForEditingWords: tempStorageForEditingWords,
 	}, nil
 }
 
@@ -65,7 +74,7 @@ func (b *TgBotModel) ListenForUpdates() {
 	updates := b.bot.GetUpdatesChan(u)
 
 	for update := range updates {
-		ProcessCommands(b, update)
+		go ProcessCommands(b, update)
 	}
 }
 

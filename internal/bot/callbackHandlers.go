@@ -2,8 +2,8 @@ package bot
 
 import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"io/ioutil"
 	"strings"
+	"wordeeBot/internal/keyboard"
 	"wordeeBot/internal/messages"
 	"wordeeBot/internal/model/db"
 	"wordeeBot/internal/pdf"
@@ -25,9 +25,9 @@ func handleShowDictionaries(b *TgBotModel, update tgbotapi.Update, id int) error
 }
 
 func handleCreateDictionary(b *TgBotModel, update tgbotapi.Update) error {
-	b.userLastCommand[update.CallbackQuery.From.ID] = "createDictionary_name"
+	b.userLastCommand[update.CallbackQuery.From.ID] = "createDictionary"
 
-	msgEdit := messages.GetCreationDictionaryMessage(update.CallbackQuery.Message.Chat.ID,
+	msgEdit := messages.GetCreateDictionaryMessage(update.CallbackQuery.Message.Chat.ID,
 		update.CallbackQuery.Message.MessageID)
 	b.bot.Send(msgEdit)
 
@@ -56,7 +56,6 @@ func handleMainMenu(b *TgBotModel, update tgbotapi.Update) error {
 
 	msgEdit := messages.GetEditStartMessage(update.CallbackQuery.Message.Chat.ID,
 		update.CallbackQuery.Message.MessageID)
-
 	b.bot.Send(msgEdit)
 
 	return nil
@@ -66,7 +65,7 @@ func handleCreateDictionaryColumns(b *TgBotModel, update tgbotapi.Update, id int
 	if strings.Contains(update.CallbackQuery.Data, "confirm") {
 		return handleConfirm(b, update, id)
 	} else {
-		handleNewColumn(b, update)
+		handleColumn(b, update)
 		return nil
 	}
 }
@@ -83,36 +82,46 @@ func handleConfirm(b *TgBotModel, update tgbotapi.Update, id int) error {
 
 	msg := messages.GetMessageDictionaryIsCreated(update.CallbackQuery.Message.Chat.ID,
 		update.CallbackQuery.Message.MessageID)
-	m, _ := b.bot.Send(msg)
-
-	b.userlastMessageID[update.CallbackQuery.From.ID] = m.MessageID
+	b.bot.Send(msg)
 
 	return nil
 }
 
-func handleNewColumn(b *TgBotModel, update tgbotapi.Update) {
+func handleColumn(b *TgBotModel, update tgbotapi.Update) {
 	ind := strings.Index(update.CallbackQuery.Data, "_")
-	arr := b.tempColumnsForDictionaries[DictionaryIdentificator{UserID: update.CallbackQuery.From.ID,
-		Name: update.CallbackQuery.Data[(ind + 1):]}]
+	dictionaryName := update.CallbackQuery.Data[(ind + 1):]
+	di := DictionaryIdentificator{UserID: update.CallbackQuery.From.ID,
+		Name: dictionaryName}
+
+	arr := b.tempColumnsForDictionaries[di]
 
 	if !checkColumn(&arr, update.CallbackQuery.Data[0:ind]) {
 		arr = append(arr, update.CallbackQuery.Data[0:ind])
-		b.tempColumnsForDictionaries[DictionaryIdentificator{UserID: update.CallbackQuery.From.ID,
-			Name: update.CallbackQuery.Data[(ind + 1):]}] = arr
+		b.tempColumnsForDictionaries[di] = arr
+	} else {
+		for i, item := range arr {
+			if item == update.CallbackQuery.Data[0:ind] {
+				arr = append(arr[:i], arr[i+1:]...)
+				b.tempColumnsForDictionaries[di] = arr
+			}
+		}
 	}
+
+	msgEdit := tgbotapi.NewEditMessageReplyMarkup(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Message.MessageID,
+		keyboard.CreateKeyboardWithColumns(dictionaryName, arr))
+
+	b.bot.Send(msgEdit)
 }
 
-func handleChoosingDictionaryForEditing(b *TgBotModel, update tgbotapi.Update) error {
+func handleChooseDictionaryForEdit(b *TgBotModel, update tgbotapi.Update) error {
 	b.userLastCommand[update.CallbackQuery.From.ID] = "editDictionary_name"
 
 	msg := messages.GetMessageToEditDictionary(update.CallbackQuery.Message.Chat.ID,
 		update.CallbackQuery.Data)
+	b.bot.Send(msg)
 
-	msgEdit := messages.GetEditStartMessage(update.CallbackQuery.Message.Chat.ID, b.userlastMessageID[update.CallbackQuery.From.ID])
+	msgEdit := messages.GetEditStartMessage(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Message.MessageID)
 	b.bot.Send(msgEdit)
-
-	m, _ := b.bot.Send(msg)
-	b.userlastMessageID[update.CallbackQuery.From.ID] = m.MessageID
 
 	return nil
 }
@@ -120,41 +129,45 @@ func handleChoosingDictionaryForEditing(b *TgBotModel, update tgbotapi.Update) e
 func handleDictionaryEditing(b *TgBotModel, update tgbotapi.Update, id int) error {
 	ind := strings.Index(update.CallbackQuery.Data, "_")
 	name := update.CallbackQuery.Data[(ind + 1):]
+	b.userLastCommand[update.CallbackQuery.From.ID] = "addingWord_" + name
+
 	columns, err := b.dictionaryStorage.GetNamesOfDictionaryColumns(id, name)
 	if err != nil {
 		return err
 	}
-	b.userLastCommand[update.CallbackQuery.From.ID] = "addingWord_" + name
 
 	msgEdit := messages.GetEditStartMessage(update.CallbackQuery.Message.Chat.ID, b.userlastMessageID[update.CallbackQuery.From.ID])
 	b.bot.Send(msgEdit)
 
-	msg := messages.GetMessageToAdding(update.CallbackQuery.Message.Chat.ID, name, columns)
-	b.bot.Send(msg)
-
-	msg = messages.GetMessageWithSomeInformationAboutAdding(update.CallbackQuery.Message.Chat.ID)
+	b.tempStorageForEditingWords[update.CallbackQuery.From.ID] = &StructForAddingWord{
+		Word:    new(db.Word),
+		Columns: columns,
+		Count:   1,
+	}
+	msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Введите слово:")
 	b.bot.Send(msg)
 	return nil
 }
 
 func handleAddingWord(b *TgBotModel, update tgbotapi.Update) error {
-	word := b.tempStorageForAddingWords[update.CallbackQuery.From.ID]
-	if err := b.wordsStorage.AddWord(word); err != nil {
+	temp := b.tempStorageForEditingWords[update.CallbackQuery.From.ID]
+	if err := b.wordsStorage.AddWord(temp.Word); err != nil {
 		return err
 	}
 
-	b.bot.Send(messages.GetCongratulateWithAdding(update.CallbackQuery.Message.Chat.ID))
-	b.bot.Send(messages.GetStartMessage(update.CallbackQuery.Message.Chat.ID))
+	msg := tgbotapi.NewEditMessageTextAndMarkup(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Message.MessageID, "Слово успешно добавлено", keyboard.CreateMainKeyboard())
+	b.bot.Send(msg)
 
 	return nil
 }
 
 func handleCancelledAddingWord(b *TgBotModel, update tgbotapi.Update) error {
-	b.bot.Send(messages.GetStartMessage(update.CallbackQuery.Message.Chat.ID))
+	b.bot.Send(tgbotapi.NewEditMessageTextAndMarkup(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Message.MessageID, "Добавление слова отменено", keyboard.CreateMainKeyboard()))
 	return nil
 }
 
 func handleSendParticularDictionary(b *TgBotModel, update tgbotapi.Update, id int) error {
+	fields := getFields()
 	dictionaryName := update.CallbackQuery.Data
 	dictionaryId, err := b.dictionaryStorage.GetDictionaryId(id, dictionaryName)
 	if err != nil {
@@ -167,15 +180,6 @@ func handleSendParticularDictionary(b *TgBotModel, update tgbotapi.Update, id in
 		return err
 	}
 
-	fields := make(map[string]bool)
-	fields["Перевод"] = false
-	fields["Транскрипция"] = false
-	fields["Синонимы"] = false
-	fields["Aнтонимы"] = false
-	fields["Определение"] = false
-	fields["Коллокации"] = false
-	fields["Идиомы"] = false
-
 	columns, err := b.dictionaryStorage.GetNamesOfDictionaryColumns(id, dictionaryName)
 	if err != nil {
 		return err
@@ -185,21 +189,33 @@ func handleSendParticularDictionary(b *TgBotModel, update tgbotapi.Update, id in
 		fields[column] = true
 	}
 
-	err = pdf.MakeDictionaryPDF(dictionaryName, words, fields)
+	err, file := pdf.MakeDictionaryPDF(dictionaryName, words, fields)
 	if err != nil {
 		return err
 	}
 
-	fileBytes, err := ioutil.ReadFile("dictionary.pdf")
+	b.bot.Send(tgbotapi.NewDeleteMessage(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Message.MessageID))
+	b.bot.Send(tgbotapi.NewDocument(update.CallbackQuery.Message.Chat.ID, file))
+	b.bot.Send(messages.GetStartMessage(update.CallbackQuery.Message.Chat.ID))
+
+	return nil
+}
+
+func handleStudyWords(b *TgBotModel, update tgbotapi.Update, id int) error {
+	b.userLastCommand[update.SentFrom().ID] = "studyWords"
+
+	names, err := b.dictionaryStorage.GetNamesOfUserDicitonariesWithDefinition(id)
 	if err != nil {
 		return err
 	}
 
-	file := tgbotapi.FileBytes{Name: "dictionary.pdf", Bytes: fileBytes}
-
-	msg := tgbotapi.NewDocument(update.CallbackQuery.Message.Chat.ID, file)
-
-	b.bot.Send(msg)
+	if len(names) == 0 {
+		b.bot.Send(tgbotapi.NewEditMessageTextAndMarkup(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Message.MessageID,
+			"Не создано ни одного словаря, удовлетворяющего условиям", tgbotapi.NewInlineKeyboardMarkup()))
+	} else {
+		b.bot.Send(tgbotapi.NewEditMessageTextAndMarkup(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Message.MessageID,
+			"Список словарей доступных для изучения:", keyboard.CreateKeyboardToShowDict(names)))
+	}
 
 	return nil
 }
@@ -211,4 +227,17 @@ func checkColumn(arr *[]string, column string) bool {
 		}
 	}
 	return false
+}
+
+func getFields() map[string]bool {
+	fields := make(map[string]bool)
+	fields["Перевод"] = false
+	fields["Транскрипция"] = false
+	fields["Синонимы"] = false
+	fields["Aнтонимы"] = false
+	fields["Определение"] = false
+	fields["Коллокации"] = false
+	fields["Идиомы"] = false
+
+	return fields
 }

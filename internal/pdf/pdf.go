@@ -1,44 +1,17 @@
 package pdf
 
 import (
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/jung-kurt/gofpdf"
+	"io/ioutil"
 	"strings"
 	"wordeeBot/internal/model/db"
 )
 
-func MakeDictionaryPDF(dictionaryName string, words []db.Word, fields map[string]bool) error {
-	colNum := 1
-	for _, isField := range fields {
-		if isField {
-			colNum++
-		}
-	}
-
-	colNames := make([]string, 0)
-	colNames = append(colNames, "Слово")
-	for _, field := range db.DbWordFields {
-		if fields[field] {
-			colNames = append(colNames, field)
-		}
-	}
-
-	orientation := gofpdf.OrientationPortrait
-	if colNum > 4 {
-		orientation = gofpdf.OrientationLandscape
-	}
-
-	sizeStr := "A4"
-	if colNum > 4 && colNum <= 6 {
-		sizeStr = "A3"
-	} else if colNum > 6 {
-		sizeStr = "A2"
-	}
-
-	pdf := gofpdf.New(orientation, "mm", sizeStr, "")
-	pdf.AddUTF8Font("DejaVu", "", "DejaVuSans.ttf")
-	pdf.SetFont("DejaVu", "", 16)
-	pdf.AddPage()
-
+func MakeDictionaryPDF(dictionaryName string, words []db.Word, fields map[string]bool) (error, *tgbotapi.FileBytes) {
+	colNum := calculateColNums(&fields)
+	colNames := createColNames(&fields)
+	pdf := createPDF(&colNum)
 	pageWidth, _ := pdf.GetPageSize()
 
 	pdf.Text(pageWidth/2-pdf.GetStringWidth(dictionaryName)/2, 20, strings.ToUpper(dictionaryName))
@@ -149,7 +122,17 @@ func MakeDictionaryPDF(dictionaryName string, words []db.Word, fields map[string
 
 	}
 
-	return pdf.OutputFileAndClose("dictionary.pdf")
+	err := pdf.OutputFileAndClose(dictionaryName + ".pdf")
+	if err != nil {
+		return err, nil
+	}
+
+	fileBytes, err := ioutil.ReadFile(dictionaryName + ".pdf")
+	if err != nil {
+		return err, nil
+	}
+
+	return nil, &tgbotapi.FileBytes{Name: dictionaryName + ".pdf", Bytes: fileBytes}
 }
 
 func max(a, b int) int {
@@ -158,4 +141,50 @@ func max(a, b int) int {
 	}
 
 	return b
+}
+
+func calculateColNums(fields *map[string]bool) int {
+	colNum := 0
+
+	for _, isField := range *fields {
+		if isField {
+			colNum++
+		}
+	}
+
+	return colNum
+}
+
+func createColNames(fields *map[string]bool) []string {
+	colNames := make([]string, 0)
+
+	colNames = append(colNames, "Слово")
+	for _, field := range db.DbWordFields {
+		if (*fields)[field] {
+			colNames = append(colNames, field)
+		}
+	}
+
+	return colNames
+}
+
+func createPDF(colNum *int) *gofpdf.Fpdf {
+	orientation := gofpdf.OrientationPortrait
+	if *colNum > 4 {
+		orientation = gofpdf.OrientationLandscape
+	}
+
+	sizeStr := "A4"
+	if *colNum > 4 && *colNum <= 6 {
+		sizeStr = "A3"
+	} else if *colNum > 6 {
+		sizeStr = "A2"
+	}
+
+	pdf := gofpdf.New(orientation, "mm", sizeStr, "")
+	pdf.AddUTF8Font("DejaVu", "", "DejaVuSans.ttf")
+	pdf.SetFont("DejaVu", "", 16)
+	pdf.AddPage()
+
+	return pdf
 }

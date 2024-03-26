@@ -19,43 +19,9 @@ func GetEditStartMessage(chat_id int64, msg_id int) tgbotapi.EditMessageTextConf
 	return msg
 }
 
-func GetMessageToAdding(chat_id int64, name string, columns []string) tgbotapi.MessageConfig {
-	msg := tgbotapi.NewMessage(chat_id, "Давайте добавим слово в словарь "+name+".Он состоит из следующих столбцов:\nСлово\n")
-	for _, column := range columns {
-		msg.Text += column + "\n"
-	}
-
-	return msg
-}
-
-func GetMessageWithSomeInformationAboutAdding(chat_id int64) tgbotapi.MessageConfig {
-	text := "Введите информацию о слове в следующем виде. Пример представлен в случае ввода всех столбцов. Но если у вас нет каких-либо," +
-		" то просто сразу перейдите к следующему, если в некоторой строке вам надо несколько опций,то разделяйте их ;(точкой с запятой).Если вы " +
-		"добавите информацию в столбец которого нет в словаре, то данная информация будет проигнорирована. Также придерживайтесь" +
-		"порядка полей, указанного в примере:\n" +
-		"*Слово:* Clever.\n" +
-		"*Транскрипция:* /ˈklɛvər/.\n" +
-		"*Перевод:*Умный *;* сообразительный.\n" +
-		"*Синонимы:*intelligent *;* smart *;* bright.\n" +
-		"*Антонимы:*foolish *;* stupid *;* unintelligent.\n" +
-		"*Определение:*Having the ability to learn, understand, and apply knowledge quickly and effectively *;* mentally agile.\n" +
-		"*Коллокации:*a clever idea *;* a clever solution *;* cleverly designed.\n" +
-		"*Идиомы:*As clever as a fox."
-
-	msg := tgbotapi.NewMessage(chat_id, text)
-	msg.ParseMode = "Markdown"
-
-	return msg
-}
-
 func GetMessageProblemsWithParsing(chat_id int64) tgbotapi.MessageConfig {
 	msg := tgbotapi.NewMessage(chat_id, "Проблемы с обработкой входной информации."+
 		"Пожалуйста, перепроверьте ее на соответствие образцу")
-	return msg
-}
-
-func GetCongratulateWithAdding(chat_id int64) tgbotapi.MessageConfig {
-	msg := tgbotapi.NewMessage(chat_id, "Слово успешно добавлено в словарь")
 	return msg
 }
 
@@ -92,10 +58,8 @@ func GetEditMyDictionaryMessage(chatId int64, messageId int, dictionaries []stri
 	return msgEdit
 }
 
-func GetCreationDictionaryMessage(chatId int64, messageId int) tgbotapi.EditMessageTextConfig {
+func GetCreateDictionaryMessage(chatId int64, messageId int) tgbotapi.EditMessageTextConfig {
 	msgEdit := tgbotapi.NewEditMessageText(chatId, messageId, "Введите название нового словаря")
-	keyboardMarkup := keyboard.CreateKeyboardCreationDictionary()
-	msgEdit.ReplyMarkup = &keyboardMarkup
 	return msgEdit
 }
 
@@ -111,4 +75,15 @@ func GetMessageToEditDictionary(chatId int64, name string) tgbotapi.MessageConfi
 	keyboardMarkup := keyboard.CreateKeyboardWithEditingOptions(name)
 	msg.ReplyMarkup = &keyboardMarkup
 	return msg
+}
+
+var Column2Text = map[string]string{
+	"Слово":        "Введите слово:",
+	"Транскрипция": "Введите транскрипцию",
+	"Перевод":      "Введите перевод.Если есть несколько вариантов, то разделите ;",
+	"Синонимы":     "Введите синонимы.Если есть несколько вариантов, то разделите ;",
+	"Антонимы":     "Введите антонимы.Если есть несколько вариантов, то разделите ;",
+	"Определение":  "Введите определение.Если есть нексколько вариантов, то разделите ;",
+	"Коллокации":   "Введите коллокации.Если есть несколько вариантов, то разделите ;",
+	"Идиомы":       "Введите идиомы.Если есть несколько вариантов, то разделите ;",
 }

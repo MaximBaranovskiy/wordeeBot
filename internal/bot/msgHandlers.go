@@ -2,10 +2,11 @@ package bot
 
 import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"regexp"
 	"strings"
 	"wordeeBot/internal/keyboard"
 	"wordeeBot/internal/messages"
-	"wordeeBot/internal/parsing"
+	"wordeeBot/internal/model/db"
 )
 
 func handleStart(b *TgBotModel, update tgbotapi.Update) error {
@@ -19,7 +20,14 @@ func handleStart(b *TgBotModel, update tgbotapi.Update) error {
 }
 
 func handleCreateDictionaryName(b *TgBotModel, update tgbotapi.Update, id int) error {
-	b.userLastCommand[update.Message.From.ID] = "createDictionary_columns"
+	b.userLastCommand[update.Message.From.ID] = "createDictionary_name"
+
+	ok := validateName(update.Message.Text)
+	if !ok {
+		b.bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Введено некорректное имя словаря.Имя может содержать только английсские и русские буквы,цифры и знак нижнего подчеркивания"))
+		b.bot.Send(messages.GetStartMessage(update.Message.Chat.ID))
+		return nil
+	}
 
 	ok, err := b.dictionaryStorage.CheckDicitonary(strings.ToLower(update.Message.Text), id)
 	if err != nil {
@@ -33,7 +41,7 @@ func handleCreateDictionaryName(b *TgBotModel, update tgbotapi.Update, id int) e
 	} else {
 		b.tempColumnsForDictionaries[DictionaryIdentificator{UserID: update.Message.From.ID,
 			Name: strings.ToLower(update.Message.Text)}] = make([]string, 0)
-		keyboardMarkup := keyboard.CreateKeyboardWithColumns(strings.ToLower(update.Message.Text))
+		keyboardMarkup := keyboard.CreateKeyboardWithColumns(strings.ToLower(update.Message.Text), []string{})
 		msg.ReplyMarkup = &keyboardMarkup
 	}
 
@@ -46,32 +54,70 @@ func handleCreateDictionaryName(b *TgBotModel, update tgbotapi.Update, id int) e
 }
 
 func handlePreparationAddingWord(b *TgBotModel, update tgbotapi.Update, id int) error {
-	text := update.Message.Text
 	ind := strings.Index(b.userLastCommand[update.Message.From.ID], "_")
 	dictionaryId, err := b.dictionaryStorage.GetDictionaryId(id, b.userLastCommand[update.Message.From.ID][(ind+1):])
 	if err != nil {
 		return err
 	}
 
-	word, err := parsing.ParseInfoForAdding(text, dictionaryId)
-	if err != nil {
-		return err
-	}
+	text := update.Message.Text
+	temp := b.tempStorageForEditingWords[update.SentFrom().ID]
 
-	if word != nil {
-		ok, err := b.wordsStorage.CheckWord(dictionaryId, word.Writing)
-		if err != nil {
-			return err
-		}
+	msg := tgbotapi.NewMessage(update.Message.Chat.ID, " ")
 
-		if ok {
-			b.bot.Send(messages.GetMessageWordInDictionary(update.Message.Chat.ID))
-			b.bot.Send(messages.GetStartMessage(update.Message.Chat.ID))
-		} else {
-			b.bot.Send(messages.GetMessageWordNotInDictionary(update.Message.Chat.ID, word.ToString()))
-			b.tempStorageForAddingWords[update.Message.From.ID] = word
+	if temp.Count >= len(temp.Columns) {
+		newValue(temp.Word, temp.Columns[temp.Count-1], text)
+		b.bot.Send(messages.GetMessageWordNotInDictionary(update.Message.Chat.ID, temp.Word.ToString()))
+		return nil
+	} else {
+		if temp.Count == 1 {
+			temp.Word.DictionaryId = dictionaryId
+
+			ok, err := b.wordsStorage.CheckWord(dictionaryId, text)
+			if err != nil {
+				return err
+			}
+
+			if ok {
+				b.bot.Send(messages.GetMessageWordInDictionary(update.Message.Chat.ID))
+				b.bot.Send(messages.GetStartMessage(update.Message.Chat.ID))
+				return nil
+			}
 		}
+		newValue(temp.Word, temp.Columns[temp.Count-1], text)
+		msg.Text = messages.Column2Text[temp.Columns[temp.Count]]
+		temp.Count++
+		b.bot.Send(msg)
+
 	}
 
 	return nil
+}
+
+func newValue(word *db.Word, columnName, value string) {
+	switch columnName {
+	case "Слово":
+		word.Writing = value
+	case "Транскрипция":
+		word.Transcription = value
+	case "Перевод":
+		word.Translation = value
+	case "Синонимы":
+		word.Synonyms = value
+	case "Антонимы":
+		word.Antonyms = value
+	case "Определение":
+		word.Definition = value
+	case "Коллокации":
+		word.Collocations = value
+	case "Идиомы":
+		word.Idioms = value
+	}
+
+}
+
+func validateName(name string) bool {
+	validNamePattern := `^[a-zA-Zа-яА-Я0-9_]+$`
+	matched, _ := regexp.MatchString(validNamePattern, name)
+	return matched
 }

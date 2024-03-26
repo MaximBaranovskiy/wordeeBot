@@ -47,6 +47,29 @@ func (storage *DictionaryStorage) GetNamesOfUserDictionaries(id int) ([]string, 
 	return names, nil
 }
 
+func (storage *DictionaryStorage) GetNamesOfUserDicitonariesWithDefinition(id int) ([]string, error) {
+	names := make([]string, 0)
+
+	rows, err := storage.db.Query("SELECT id,user_id,name FROM dictionaries WHERE user_id = $1 AND is_definition = $2", id, true)
+	if err != nil {
+		return nil, myErrors.ErrSql
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var dict Dictionary
+
+		err = rows.Scan(&dict.ID, &dict.UserId, &dict.Name)
+		if err != nil {
+			return nil, myErrors.ErrSql
+		}
+
+		names = append(names, dict.Name)
+	}
+
+	return names, nil
+}
+
 func (storage *DictionaryStorage) CheckDicitonary(name string, id int) (bool, error) {
 	var count int
 
@@ -92,6 +115,7 @@ func (storage *DictionaryStorage) GetNamesOfDictionaryColumns(id int, name strin
 	}
 
 	columns := make([]string, 0)
+	columns = append(columns, "Слово")
 	checkField(dict.IsTranscription, "Транскрипция", &columns)
 	checkField(dict.IsTranslation, "Перевод", &columns)
 	checkField(dict.IsSynonyms, "Синонимы", &columns)
