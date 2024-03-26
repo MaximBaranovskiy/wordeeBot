@@ -1,8 +1,8 @@
 package db
 
 type User struct {
-	ID      int
-	User_id int64
+	User_id  int64
+	Username string
 }
 
 type Dictionary struct {

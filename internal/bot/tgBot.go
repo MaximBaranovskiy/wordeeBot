@@ -30,7 +30,7 @@ type DictionaryIdentificator struct {
 	Name   string
 }
 
-func NewClient(token string) (*TgBotModel, error) {
+func NewBot(token string) (*TgBotModel, error) {
 	client, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		return nil, errors.Wrap(err, "Проблемы при инициализации бота")
@@ -74,20 +74,20 @@ func (b *TgBotModel) ListenForUpdates() {
 	updates := b.bot.GetUpdatesChan(u)
 
 	for update := range updates {
-		go ProcessCommands(b, update)
+		go b.processCommands(update)
 	}
 }
 
-func ProcessCommands(b *TgBotModel, update tgbotapi.Update) {
-	id, err := b.userStorage.CheckUser(update.SentFrom().ID)
+func (b *TgBotModel) processCommands(update tgbotapi.Update) {
+	err := b.userStorage.CheckUser(update.SentFrom().ID, update.SentFrom().UserName)
 	if err != nil {
 		myErrors.HandleError(b.bot, update.Message.Chat.ID, err)
 		return
 	}
 
 	if update.CallbackQuery != nil {
-		handleCallbacks(b, update, id)
+		handleCallbacks(b, update)
 	} else if update.Message != nil {
-		handleMessages(b, update, id)
+		handleMessages(b, update)
 	}
 }

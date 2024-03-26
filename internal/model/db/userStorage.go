@@ -1,9 +1,9 @@
 package db
 
 import (
-	"database/sql"
+	"fmt"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
+	"os"
 	"wordeeBot/internal/myErrors"
 )
 
@@ -12,7 +12,15 @@ type UserStorage struct {
 }
 
 func NewUserStorage() (*UserStorage, error) {
-	db, err := sqlx.Open("postgres", "user=USER password=PASSWORD dbname=DBNAME sslmode=disable")
+	host := os.Getenv("DB_HOST")
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+	dbname := os.Getenv("DB_NAME")
+	sslmode := os.Getenv("DB_SSLMODE")
+	port := os.Getenv("DB_PORT")
+
+	db, err := sqlx.Open("postgres", fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s", host, port, user, password, dbname, sslmode))
+
 	if err != nil {
 		return nil, myErrors.ErrSql
 	}
@@ -24,32 +32,26 @@ func NewUserStorage() (*UserStorage, error) {
 	return &UserStorage{db: db}, nil
 }
 
-func (storage *UserStorage) CheckUser(user_id int64) (int, error) {
-	var user User
+func (storage *UserStorage) CheckUser(user_id int64, username string) error {
+	var count int
 
-	err := storage.db.QueryRow("SELECT * FROM users WHERE user_id = $1", user_id).Scan(&user.ID, &user.User_id)
-
+	err := storage.db.QueryRow("SELECT COUNT(*) FROM users WHERE user_id = $1", user_id).Scan(&count)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			id, err := storage.addUser(user_id)
-			if err != nil {
-				return -1, myErrors.ErrSql
-			}
-
-			return id, nil
-		}
-
-		return -1, myErrors.ErrSql
+		return myErrors.ErrSql
 	}
 
-	return user.ID, nil
+	if count == 0 {
+		err := storage.addUser(user_id, username)
+		return err
+	}
+
+	return nil
 }
 
-func (storage *UserStorage) addUser(user_id int64) (int, error) {
-	var id int
-	err := storage.db.QueryRow("INSERT INTO users (user_id) VALUES($1) RETURNING id", user_id).Scan(&id)
+func (storage *UserStorage) addUser(user_id int64, username string) error {
+	_, err := storage.db.Exec("INSERT INTO users (user_id,username) VALUES($1,$2)", user_id, username)
 	if err != nil {
-		return -1, myErrors.ErrSql
+		return myErrors.ErrSql
 	}
-	return id, nil
+	return nil
 }

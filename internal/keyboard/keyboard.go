@@ -13,9 +13,6 @@ func CreateMainKeyboard() tgbotapi.InlineKeyboardMarkup {
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("Редактировать словарь✏️", "editDictionary"),
 		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Изучение слов🏫", "studyWords"),
-		),
 	)
 }
 

@@ -19,7 +19,7 @@ func handleStart(b *TgBotModel, update tgbotapi.Update) error {
 	return nil
 }
 
-func handleCreateDictionaryName(b *TgBotModel, update tgbotapi.Update, id int) error {
+func handleCreateDictionaryName(b *TgBotModel, update tgbotapi.Update) error {
 	b.userLastCommand[update.Message.From.ID] = "createDictionary_name"
 
 	ok := validateName(update.Message.Text)
@@ -29,7 +29,7 @@ func handleCreateDictionaryName(b *TgBotModel, update tgbotapi.Update, id int) e
 		return nil
 	}
 
-	ok, err := b.dictionaryStorage.CheckDicitonary(strings.ToLower(update.Message.Text), id)
+	ok, err := b.dictionaryStorage.CheckDicitonary(strings.ToLower(update.Message.Text), update.SentFrom().ID)
 	if err != nil {
 		return err
 	}
@@ -53,9 +53,9 @@ func handleCreateDictionaryName(b *TgBotModel, update tgbotapi.Update, id int) e
 	return nil
 }
 
-func handlePreparationAddingWord(b *TgBotModel, update tgbotapi.Update, id int) error {
+func handlePreparationAddingWord(b *TgBotModel, update tgbotapi.Update) error {
 	ind := strings.Index(b.userLastCommand[update.Message.From.ID], "_")
-	dictionaryId, err := b.dictionaryStorage.GetDictionaryId(id, b.userLastCommand[update.Message.From.ID][(ind+1):])
+	dictionaryId, err := b.dictionaryStorage.GetDictionaryId(update.SentFrom().ID, b.userLastCommand[update.Message.From.ID][(ind+1):])
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,9 @@
 package db
 
 import (
+	"fmt"
 	"github.com/jmoiron/sqlx"
+	"os"
 	"wordeeBot/internal/myErrors"
 )
 
@@ -10,7 +12,14 @@ type WordsStorage struct {
 }
 
 func NewWordsStorage() (*WordsStorage, error) {
-	db, err := sqlx.Open("postgres", "user=USER password=PASSWORD dbname=DBNAME sslmode=disable")
+	host := os.Getenv("DB_HOST")
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+	dbname := os.Getenv("DB_NAME")
+	sslmode := os.Getenv("DB_SSLMODE")
+	port := os.Getenv("DB_PORT")
+
+	db, err := sqlx.Open("postgres", fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s", host, port, user, password, dbname, sslmode))
 	if err != nil {
 		return nil, myErrors.ErrSql
 	}

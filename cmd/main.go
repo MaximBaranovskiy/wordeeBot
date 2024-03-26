@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	bot, err := bot.NewClient("BOT_TOKEN")
+	bot, err := bot.NewBot("BOT_TOKEN")
 	if err != nil {
 		log.Fatal(err)
 	}

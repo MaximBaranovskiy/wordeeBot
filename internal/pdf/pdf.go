@@ -182,7 +182,7 @@ func createPDF(colNum *int) *gofpdf.Fpdf {
 	}
 
 	pdf := gofpdf.New(orientation, "mm", sizeStr, "")
-	pdf.AddUTF8Font("DejaVu", "", "DejaVuSans.ttf")
+	pdf.AddUTF8Font("DejaVu", "", "internal/src/DejaVuSans.ttf")
 	pdf.SetFont("DejaVu", "", 16)
 	pdf.AddPage()
 

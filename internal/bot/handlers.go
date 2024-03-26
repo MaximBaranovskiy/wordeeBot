@@ -6,12 +6,12 @@ import (
 	"wordeeBot/internal/myErrors"
 )
 
-func handleCallbacks(b *TgBotModel, update tgbotapi.Update, id int) {
+func handleCallbacks(b *TgBotModel, update tgbotapi.Update) {
 	switch {
 
 	case strings.Contains(update.CallbackQuery.Data, "myDictionaries"):
 
-		myErrors.HandleError(b.bot, update.CallbackQuery.Message.Chat.ID, handleShowDictionaries(b, update, id))
+		myErrors.HandleError(b.bot, update.CallbackQuery.Message.Chat.ID, handleShowDictionaries(b, update))
 
 	case strings.Contains(update.CallbackQuery.Data, "createDictionary"):
 
@@ -19,11 +19,7 @@ func handleCallbacks(b *TgBotModel, update tgbotapi.Update, id int) {
 
 	case strings.Contains(update.CallbackQuery.Data, "editDictionary"):
 
-		myErrors.HandleError(b.bot, update.CallbackQuery.Message.Chat.ID, handleEditDictionary(b, update, id))
-
-	case strings.Contains(update.CallbackQuery.Data, "studyWords"):
-
-		myErrors.HandleError(b.bot, update.CallbackQuery.Message.Chat.ID, handleStudyWords(b, update, id))
+		myErrors.HandleError(b.bot, update.CallbackQuery.Message.Chat.ID, handleEditDictionary(b, update))
 
 	case strings.Contains(update.CallbackQuery.Data, "mainMenu"):
 
@@ -31,7 +27,7 @@ func handleCallbacks(b *TgBotModel, update tgbotapi.Update, id int) {
 
 	case b.userLastCommand[update.CallbackQuery.From.ID] == "createDictionary_name":
 
-		myErrors.HandleError(b.bot, update.CallbackQuery.Message.Chat.ID, handleCreateDictionaryColumns(b, update, id))
+		myErrors.HandleError(b.bot, update.CallbackQuery.Message.Chat.ID, handleCreateDictionaryColumns(b, update))
 
 	case b.userLastCommand[update.CallbackQuery.From.ID] == "editDictionary":
 
@@ -39,7 +35,7 @@ func handleCallbacks(b *TgBotModel, update tgbotapi.Update, id int) {
 
 	case b.userLastCommand[update.CallbackQuery.From.ID] == "editDictionary_name":
 
-		myErrors.HandleError(b.bot, update.CallbackQuery.Message.Chat.ID, handleDictionaryEditing(b, update, id))
+		myErrors.HandleError(b.bot, update.CallbackQuery.Message.Chat.ID, handleDictionaryEditing(b, update))
 
 	case strings.Contains(update.CallbackQuery.Data, "addingWord"):
 
@@ -51,12 +47,12 @@ func handleCallbacks(b *TgBotModel, update tgbotapi.Update, id int) {
 
 	case b.userLastCommand[update.CallbackQuery.From.ID] == "myDictionaries":
 
-		myErrors.HandleError(b.bot, update.CallbackQuery.Message.Chat.ID, handleSendParticularDictionary(b, update, id))
+		myErrors.HandleError(b.bot, update.CallbackQuery.Message.Chat.ID, handleSendParticularDictionary(b, update))
 
 	}
 }
 
-func handleMessages(b *TgBotModel, update tgbotapi.Update, id int) {
+func handleMessages(b *TgBotModel, update tgbotapi.Update) {
 	switch {
 
 	case strings.Contains(update.Message.Text, "start"):
@@ -65,11 +61,11 @@ func handleMessages(b *TgBotModel, update tgbotapi.Update, id int) {
 
 	case b.userLastCommand[update.Message.From.ID] == "createDictionary":
 
-		myErrors.HandleError(b.bot, update.Message.Chat.ID, handleCreateDictionaryName(b, update, id))
+		myErrors.HandleError(b.bot, update.Message.Chat.ID, handleCreateDictionaryName(b, update))
 
 	case strings.Contains(b.userLastCommand[update.Message.From.ID], "addingWord"):
 
-		myErrors.HandleError(b.bot, update.Message.Chat.ID, handlePreparationAddingWord(b, update, id))
+		myErrors.HandleError(b.bot, update.Message.Chat.ID, handlePreparationAddingWord(b, update))
 
 	}
 }

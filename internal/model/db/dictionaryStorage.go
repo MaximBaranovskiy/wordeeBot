@@ -3,6 +3,7 @@ package db
 import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
+	"os"
 	"strings"
 	"wordeeBot/internal/myErrors"
 )
@@ -12,7 +13,14 @@ type DictionaryStorage struct {
 }
 
 func NewDictionaryStorage() (*DictionaryStorage, error) {
-	db, err := sqlx.Open("postgres", "user=USER password=PASSWORD dbname=DBNAME sslmode=disable")
+	host := os.Getenv("DB_HOST")
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+	dbname := os.Getenv("DB_NAME")
+	sslmode := os.Getenv("DB_SSLMODE")
+	port := os.Getenv("DB_PORT")
+
+	db, err := sqlx.Open("postgres", fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s", host, port, user, password, dbname, sslmode))
 	if err != nil {
 		return nil, myErrors.ErrSql
 	}
@@ -24,10 +32,10 @@ func NewDictionaryStorage() (*DictionaryStorage, error) {
 	return &DictionaryStorage{db: db}, nil
 }
 
-func (storage *DictionaryStorage) GetNamesOfUserDictionaries(id int) ([]string, error) {
+func (storage *DictionaryStorage) GetNamesOfUserDictionaries(userID int64) ([]string, error) {
 	names := make([]string, 0)
 
-	rows, err := storage.db.Query("SELECT id,user_id,name FROM dictionaries WHERE user_id = $1", id)
+	rows, err := storage.db.Query("SELECT id,user_id,name FROM dictionaries WHERE user_id = $1", userID)
 	if err != nil {
 		return nil, myErrors.ErrSql
 	}
@@ -70,10 +78,10 @@ func (storage *DictionaryStorage) GetNamesOfUserDicitonariesWithDefinition(id in
 	return names, nil
 }
 
-func (storage *DictionaryStorage) CheckDicitonary(name string, id int) (bool, error) {
+func (storage *DictionaryStorage) CheckDicitonary(name string, userId int64) (bool, error) {
 	var count int
 
-	err := storage.db.Get(&count, "SELECT COUNT(*) FROM dictionaries WHERE name = $1 AND user_id = $2", strings.ToLower(name), id)
+	err := storage.db.Get(&count, "SELECT COUNT(*) FROM dictionaries WHERE name = $1 AND user_id = $2", strings.ToLower(name), userId)
 	if err != nil {
 		return false, myErrors.ErrSql
 	}
@@ -84,15 +92,16 @@ func (storage *DictionaryStorage) CheckDicitonary(name string, id int) (bool, er
 	return true, nil
 }
 
-func (storage *DictionaryStorage) AddDictionary(name string, id int, columns []string) error {
-	_, err := storage.db.Exec("INSERT INTO dictionaries (user_id,name) VALUES($1,$2)", id, name)
+func (storage *DictionaryStorage) AddDictionary(name string, columns []string, userId int64) error {
+	_, err := storage.db.Exec("INSERT INTO dictionaries (user_id,name,is_transcription,is_translation,is_synonyms,is_antonyms,is_definition,is_collocations,is_idioms)VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+		userId, name, false, false, false, false, false, false, false)
 	if err != nil {
 		return myErrors.ErrSql
 	}
 	for _, column := range columns {
 		query := fmt.Sprintf("UPDATE dictionaries SET %s = $1 WHERE user_id = $2 AND name = $3", "is_"+column)
 
-		_, err := storage.db.Exec(query, true, id, name)
+		_, err := storage.db.Exec(query, true, userId, name)
 		if err != nil {
 			return myErrors.ErrSql
 		}
@@ -101,13 +110,13 @@ func (storage *DictionaryStorage) AddDictionary(name string, id int, columns []s
 	return nil
 }
 
-func (storage *DictionaryStorage) GetNamesOfDictionaryColumns(id int, name string) ([]string, error) {
+func (storage *DictionaryStorage) GetNamesOfDictionaryColumns(userId int64, name string) ([]string, error) {
 	var dict Dictionary
 
 	err := storage.db.QueryRow(
 		"SELECT id,user_id,name,is_transcription,is_translation,is_synonyms,"+
 			"is_antonyms,is_definition,is_collocations,is_idioms FROM dictionaries"+
-			" WHERE user_id = $1 AND name = $2", id, name).Scan(&dict.ID, &dict.UserId, &dict.Name, &dict.IsTranscription,
+			" WHERE user_id = $1 AND name = $2", userId, name).Scan(&dict.ID, &dict.UserId, &dict.Name, &dict.IsTranscription,
 		&dict.IsTranslation, &dict.IsSynonyms, &dict.IsAntonyms, &dict.IsDefinition, &dict.IsCollocations, &dict.IsIdioms)
 
 	if err != nil {
@@ -132,9 +141,9 @@ func checkField(field bool, name string, columns *[]string) {
 	}
 }
 
-func (storage *DictionaryStorage) GetDictionaryId(user_id int, name string) (int, error) {
+func (storage *DictionaryStorage) GetDictionaryId(userId int64, name string) (int, error) {
 	var id int
-	err := storage.db.QueryRow("SELECT id FROM dictionaries WHERE user_id = $1 AND name = $2", user_id, name).Scan(&id)
+	err := storage.db.QueryRow("SELECT id FROM dictionaries WHERE user_id = $1 AND name = $2", userId, name).Scan(&id)
 	if err != nil {
 		return -1, myErrors.ErrSql
 	}
