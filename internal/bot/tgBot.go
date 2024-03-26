@@ -4,6 +4,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/pkg/errors"
 	"wordeeBot/internal/model/db"
+	"wordeeBot/internal/myErrors"
 )
 
 type TgBotModel struct {
@@ -18,8 +19,8 @@ type TgBotModel struct {
 }
 
 type DictionaryIdentificator struct {
-	User_id int64
-	Name    string
+	UserID int64
+	Name   string
 }
 
 func NewClient(token string) (*TgBotModel, error) {
@@ -59,20 +60,25 @@ func NewClient(token string) (*TgBotModel, error) {
 	}, nil
 }
 
-func (c *TgBotModel) ListenForUpdates() {
+func (b *TgBotModel) ListenForUpdates() {
 	u := tgbotapi.NewUpdate(0)
-	updates := c.bot.GetUpdatesChan(u)
+	updates := b.bot.GetUpdatesChan(u)
 
 	for update := range updates {
-		ProcessCommands(c, update)
+		ProcessCommands(b, update)
 	}
 }
 
-func ProcessCommands(c *TgBotModel, update tgbotapi.Update) {
+func ProcessCommands(b *TgBotModel, update tgbotapi.Update) {
+	id, err := b.userStorage.CheckUser(update.SentFrom().ID)
+	if err != nil {
+		myErrors.HandleError(b.bot, update.Message.Chat.ID, err)
+		return
+	}
 
 	if update.CallbackQuery != nil {
-		handleCallbacks(c, update)
+		handleCallbacks(b, update, id)
 	} else if update.Message != nil {
-		handleMessages(c, update)
+		handleMessages(b, update, id)
 	}
 }
