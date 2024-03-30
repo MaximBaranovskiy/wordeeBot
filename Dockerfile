@@ -8,6 +8,4 @@ COPY ./ ./
 RUN go mod download
 RUN go build -o wordee ./cmd/main.go
 
-ENV DATABASE_URL="host=db port=5432 user=USER password=PASSWORD dbname=DBNAME sslmode=disable"
-
-CMD ["./wordee","&&","goose","-dir","./internal/migrations","postgres","${DATABASE_URL}","up"]
+CMD ["./wordee"]

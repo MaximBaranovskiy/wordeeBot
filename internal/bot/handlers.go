@@ -18,10 +18,10 @@ var callbackData2Handler = map[string]handlerFunc{
 }
 
 var usrLstCommand2Handler = map[string]handlerFunc{
-	"create_dictionary_name": handleCreateDictionaryColumns,
-	"edit_dictionary":        handleChooseDictionaryForEdit,
-	"editDictionary_name":    handleDictionaryEditing,
-	"myDictionaries":         handleSendParticularDictionary,
+	"createDictionary_name": handleCreateDictionaryColumns,
+	"editDictionary":        handleChooseDictionaryForEdit,
+	"editDictionary_name":   handleDictionaryEditing,
+	"myDictionaries":        handleSendParticularDictionary,
 }
 
 func handleCallbacks(b *TgBotModel, update tgbotapi.Update) {
